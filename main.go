@@ -5,6 +5,7 @@ import (
   "bufio"
   "log"
   "os"
+  "strings"
 )
 
 func main() {
@@ -22,13 +23,14 @@ func main() {
     if err != nil {
       log.Fatalf("ReadLine %v", err)
     }
+    words := strings.Split(string(line), " ")
 
     // これから起動するプログラムの出力と自分の出力をつなげる(6,7)
     var procAttr os.ProcAttr
     procAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
 
     // 4.入力文字列に該当するプログラムを探して起動する
-    process, err := os.StartProcess(string(line), []string{ string(line) }, &procAttr)
+    process, err := os.StartProcess(words[0], words, &procAttr)
     if err != nil {
       log.Fatalf("StartProcess %v", err)
     }
