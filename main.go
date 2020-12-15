@@ -7,6 +7,7 @@ import (
   "os"
   "strings"
   "path/filepath"
+  "io"
 )
 
 // 該当パスが存在するかどうか
@@ -59,45 +60,102 @@ func absPathWithPATH(target string) (targetAbsPath string, err error) {
   return "", fmt.Errorf("%s: no such file or directory", targetFileName)
 }
 
+// cdコマンド
+func chDir(words []string) (err error) {
+  var dir string
+  l := len(words) 
+  if l == 1 {
+    dir, err = os.UserHomeDir()
+    if err != nil {
+      log.Fatalf("os.UserHomeDir %v", err)
+    }
+  } else if l == 2 {
+    dir = words[1]
+  } else {
+    return fmt.Errorf("%s: too many arguments", "cd")
+  }
+  return os.Chdir(dir)
+}
+
+// exitコマンド
+func exit(words []string) (err error) {
+  os.Exit(0)
+  return nil
+}
+
+// 外部コマンドを実行する
+func execExternalCommand(words []string) (err error) {
+  command, err := absPathWithPATH(string(words[0]))
+  if err != nil {
+      fmt.Fprintln(os.Stderr, err)
+      return
+  }
+  log.Printf("command %s\n", command)
+
+  // これから起動するプログラムの出力と自分の出力をつなげる
+  var procAttr os.ProcAttr
+  procAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
+
+  // 該当するプログラムを探して起動する
+  process, err := os.StartProcess(command, words, &procAttr)
+  if err != nil {
+    log.Fatalf("os.StartProcess %v", err)
+  }
+
+  // 起動したプログラムが終了するまで待つ
+  _, err = process.Wait()
+  if err != nil {
+    log.Fatalf("process.Wait %v", err)
+  }
+
+  return nil
+}
+
 func main() {
 
   // 標準入力から文字列を読み取る準備
   reader := bufio.NewReader(os.Stdin)
 
-  // 0.ずっとループ
+  // 内部コマンド群
+  internalCommands := map[string] func([]string) error {
+    "cd": chDir,
+    "exit": exit,
+  }
+
+  // ずっとループ
   for {
-    // 1.プロンプトを表示してユーザに入力を促す
+    // プロンプトを表示してユーザに入力を促す
     fmt.Printf("(ore) > ")
     
-    // 3.標準入力から文字列(コマンド)を読み込む
+    // 標準入力から文字列(コマンド)を読み込む
     line, _, err := reader.ReadLine()
     if err != nil {
-      log.Fatalf("ReadLine %v", err)
-    }
-    words := strings.Split(string(line), " ")
-
-    command, err := absPathWithPATH(string(words[0]))
-    if err != nil {
-        fmt.Fprintln(os.Stderr, err)
-        continue
-    }
-    log.Printf("command %s\n", command)
-
-    // これから起動するプログラムの出力と自分の出力をつなげる(6,7)
-    var procAttr os.ProcAttr
-    procAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
-
-    // 4.入力文字列に該当するプログラムを探して起動する
-    process, err := os.StartProcess(command, words, &procAttr)
-
-    if err != nil {
-      log.Fatalf("StartProcess %v", err)
+      // Ctrl+Dの場合
+      if err == io.EOF {
+        // 終了
+        exit(nil)
+      } else {
+        log.Fatalf("reader.ReadLine %v", err)
+      }
     }
 
-    // 起動したプログラムが終了するまで待つ(8を待つ)
-    _, err = process.Wait()
+    // 入力文字列を空白ごとに単語に分解する
+    words := strings.Split(strings.Trim(string(line), " "), " ")
+
+    // 先頭の単語に該当するコマンドを探して実行する
+
+    // 内部コマンドか？
+    internalCommand, ok := internalCommands[words[0]]
+    if ok {
+      // 内部コマンドを実行
+      err = internalCommand(words)
+    } else {
+      // 外部コマンドを実行
+      err = execExternalCommand(words)
+    }
+
     if err != nil {
-      log.Fatalf("Wait %v", err)
+      fmt.Fprintln(os.Stderr, err)
     }
   }
 }
