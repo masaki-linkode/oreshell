@@ -8,6 +8,7 @@ import (
   "strings"
   "path/filepath"
   "io"
+  "oreshell/lexer"
 )
 
 // 該当パスが存在するかどうか
@@ -22,8 +23,8 @@ func absPathWithPATH(target string) (targetAbsPath string, err error) {
 
   // パスとファイル名を分離
   targetFileName := filepath.Base(target)
-  log.Printf("target %s\n", target)
-  log.Printf("targetFileName %s\n", targetFileName)
+  //log.Printf("target %s\n", target)
+  //log.Printf("targetFileName %s\n", targetFileName)
 
   // 指定された文字列がパスである場合
   if target != targetFileName {
@@ -50,10 +51,10 @@ func absPathWithPATH(target string) (targetAbsPath string, err error) {
 
   // 指定されたファイル名を環境変数パスの中から探す
   for _, path := range filepath.SplitList(os.Getenv("PATH")) {
-    log.Printf("%s\n", path)
+    //log.Printf("%s\n", path)
     targetAbsPath = filepath.Join(path, targetFileName)
     if fileIsExist(targetAbsPath) {
-      log.Printf("find in PATH %s\n", targetAbsPath)
+      //log.Printf("find in PATH %s\n", targetAbsPath)
       return targetAbsPath, nil
     }
   }
@@ -90,7 +91,7 @@ func execExternalCommand(words []string) (err error) {
       fmt.Fprintln(os.Stderr, err)
       return
   }
-  log.Printf("command %s\n", command)
+  //log.Printf("command %s\n", command)
 
   // これから起動するプログラムの出力と自分の出力をつなげる
   var procAttr os.ProcAttr
@@ -109,6 +110,28 @@ func execExternalCommand(words []string) (err error) {
   }
 
   return nil
+}
+
+func lineToWords(line string) (words []string) {
+
+  l := lexer.Lex(strings.Trim(line, " "))
+  var word string
+
+  for {
+    token := l.NextItem()
+    if token.Type == lexer.ItemWhitespace {
+      words = append(words, word)
+      word = ""
+    } else if token.Type == lexer.ItemEOF || token.Type == lexer.ItemError {
+      words = append(words, word)
+      break
+    } else {
+      word = word + token.Unescape()
+    }
+  }
+  //log.Printf("words: %v\n", words)
+
+  return words
 }
 
 func main() {
@@ -140,7 +163,8 @@ func main() {
     }
 
     // 入力文字列を空白ごとに単語に分解する
-    words := strings.Split(strings.Trim(string(line), " "), " ")
+    //words := strings.Split(strings.Trim(string(line), " "), " ")
+    words := lineToWords(string(line))
 
     // 先頭の単語に該当するコマンドを探して実行する
 
