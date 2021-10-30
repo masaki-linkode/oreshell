@@ -1,7 +1,9 @@
 package lexer
 
 import (
+	"container/list"
 	"fmt"
+	"oreshell/log"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -9,8 +11,8 @@ import (
 
 type Item struct {
 	Type itemType
-	Pos int
-	Val string
+	Pos  int
+	Val  string
 }
 
 func (me Item) String() string {
@@ -42,45 +44,58 @@ const (
 	ItemQuotedString
 	ItemWhitespace
 	ItemEOF
+	ItemRedirectionInChar
+	ItemRedirectionOutChar
+	ItemRedirectionFDNumChar
 )
 
 const eof = -1
 
-type stateFn func(*lexer) stateFn
+type stateFn func(*Lexer) stateFn
 
-type lexer struct {
+type Lexer struct {
 	input   string
 	state   stateFn
 	pos     int
 	start   int
 	width   int
 	lastPos int
-	items   chan Item
+	items   *list.List
 }
 
-func (me *lexer) NextItem() Item {
-	item := <-me.items
+func (me *Lexer) PeekItem() Item {
+	log.Logger.Printf("PeekItem\n")
+	item := me.items.Front().Value.(Item)
+	return item
+}
+
+func (me *Lexer) NextItem() Item {
+	log.Logger.Printf("NextItem\n")
+	item := me.items.Front().Value.(Item)
+	me.items.Remove(me.items.Front())
 	me.lastPos = item.Pos
 	return item
 }
 
-func Lex(input string) *lexer {
-	l := &lexer{
+func Lex(input string) *Lexer {
+	l := &Lexer{
 		input: input,
-		items: make(chan Item),
+		items: list.New(),
 	}
-	go l.run()
+	l.run()
 	return l
 }
 
-func (me *lexer) run() {
+func (me *Lexer) run() {
+	log.Logger.Printf("run start\n")
 	for me.state = lexText; me.state != nil; {
 		me.state = me.state(me)
 	}
+	log.Logger.Printf("run end\n")
 }
 
-func (me *lexer) next() rune {
-	//fmt.Printf("next\n")
+func (me *Lexer) next() rune {
+	//log.Logger.Printf("next\n")
 
 	// 現在位置が入力文字列全体を超えたか
 	if int(me.pos) >= len(me.input) {
@@ -92,39 +107,47 @@ func (me *lexer) next() rune {
 	me.width = w
 	// 現在位置を文字幅分だけ進める
 	me.pos += w
-	//fmt.Printf("next r:%v\n", r)
+	//log.Logger.Printf("next r:%v\n", r)
 	return r
 }
 
-func (me *lexer) peek() rune {
+func (me *Lexer) peek() rune {
 	r := me.next()
 	me.backup()
 	return r
 }
 
-func (me *lexer) backup() {
-	//fmt.Printf("backup\n")
+func (me *Lexer) peekpeek() rune {
+	me.next()
+	r := me.next()
+	me.backup()
+	me.backup()
+	return r
+}
+
+func (me *Lexer) backup() {
+	//log.Logger.Printf("backup\n")
 	me.pos -= me.width
-	//fmt.Printf("backup me.pos %d\n", me.pos)
+	//log.Logger.Printf("backup me.pos %d\n", me.pos)
 }
 
-func (me *lexer) emit(t itemType) {
-	//fmt.Printf("emit\n")
-	//fmt.Printf("emit item.val:[%s]\n", me.input[me.start:me.pos])
-	me.items <- Item{t, me.start, me.input[me.start:me.pos]}
+func (me *Lexer) emit(t itemType) {
+	log.Logger.Printf("emit\n")
+	log.Logger.Printf("emit item.val:[%s]\n", me.input[me.start:me.pos])
+	me.items.PushBack(Item{t, me.start, me.input[me.start:me.pos]})
 	me.start = me.pos
-	//fmt.Printf("emit me.start %d\n", me.start)
+	log.Logger.Printf("emit me.start %d\n", me.start)
 }
 
-func (me *lexer) errorf(format string, args ...interface{}) stateFn {
-	me.items <- Item{ItemError, me.start, fmt.Sprintf(format, args...)}
+func (me *Lexer) errorf(format string, args ...interface{}) stateFn {
+	me.items.PushBack(Item{ItemError, me.start, fmt.Sprintf(format, args...)})
 	return nil
 }
 
-func lexText(me *lexer) stateFn {
-	//fmt.Printf("lexText\n")
+func lexText(me *Lexer) stateFn {
+	log.Logger.Printf("lexText\n")
 	r := me.peek()
-				
+
 	if unicode.IsSpace(r) {
 		return lexWhitespace
 	} else if r == eof {
@@ -133,16 +156,27 @@ func lexText(me *lexer) stateFn {
 		return lexEscapeChar
 	} else if r == '"' || r == '\'' {
 		return lexQuotedString
+	} else if r == '>' {
+		return lexRedirectionOutChar
+	} else if r == '<' {
+		return lexRedirectionInChar
+	} else if r == '0' || r == '1' || r == '2' || r == '3' || r == '4' || r == '5' || r == '6' || r == '7' || r == '8' || r == '9' {
+		r2 := me.peekpeek()
+		if r2 == '>' || r2 == '<' {
+			return lexRedirectionFDNumChar
+		} else {
+			return lexString
+		}
 	} else {
 		return lexString
 	}
-	
+
 	me.emit(ItemEOF)
 	return nil
 }
 
-func lexWhitespace(me *lexer) stateFn {
-	//fmt.Printf("lexWhitespace\n")
+func lexWhitespace(me *Lexer) stateFn {
+	log.Logger.Printf("lexWhitespace\n")
 	me.next()
 	for unicode.IsSpace(me.peek()) {
 		me.next()
@@ -151,8 +185,8 @@ func lexWhitespace(me *lexer) stateFn {
 	return lexText
 }
 
-func lexString(me *lexer) stateFn {
-	//fmt.Printf("lexString\n")
+func lexString(me *Lexer) stateFn {
+	log.Logger.Printf("lexString\n")
 	r := me.peek()
 	if isDelimiter(r) {
 		me.emit(ItemString)
@@ -162,8 +196,8 @@ func lexString(me *lexer) stateFn {
 	return lexString
 }
 
-func lexEscapeChar(me *lexer) stateFn {
-	//fmt.Printf("lexEscapeChar\n")
+func lexEscapeChar(me *Lexer) stateFn {
+	log.Logger.Printf("lexEscapeChar\n")
 	me.next() // '\\'
 	r := me.next()
 	if r == eof {
@@ -174,8 +208,8 @@ func lexEscapeChar(me *lexer) stateFn {
 	return lexText
 }
 
-func lexQuotedString(me *lexer) stateFn {
-	//fmt.Printf("lexQuoteString\n")
+func lexQuotedString(me *Lexer) stateFn {
+	log.Logger.Printf("lexQuoteString\n")
 	q := me.next() // '"' or '\''
 
 	for {
@@ -192,5 +226,26 @@ func lexQuotedString(me *lexer) stateFn {
 }
 
 func isDelimiter(r rune) bool {
-	return unicode.IsSpace(r) || r == eof || r == '\\' || r == '"' || r == '\''
+	return unicode.IsSpace(r) || r == eof || r == '\\' || r == '"' || r == '\'' || r == '<' || r == '>'
+}
+
+func lexRedirectionInChar(me *Lexer) stateFn {
+	log.Logger.Printf("lexRedirectionInChar\n")
+	me.next()
+	me.emit(ItemRedirectionInChar)
+	return lexText
+}
+
+func lexRedirectionOutChar(me *Lexer) stateFn {
+	log.Logger.Printf("lexRedirectionOutChar\n")
+	me.next()
+	me.emit(ItemRedirectionOutChar)
+	return lexText
+}
+
+func lexRedirectionFDNumChar(me *Lexer) stateFn {
+	log.Logger.Printf("lexNumberChar\n")
+	me.next()
+	me.emit(ItemRedirectionFDNumChar)
+	return lexText
 }

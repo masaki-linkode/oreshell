@@ -1,9 +1,14 @@
 package lexer
 
 import (
-	"testing"
 	"fmt"
+	"oreshell/log"
+	"testing"
 )
+
+func init() {
+	log.Logger = log.New()
+}
 
 type lexTest struct {
 	name  string
@@ -41,6 +46,53 @@ var lexTests = []lexTest{
 		{ItemString, 0, `e`},
 		{ItemQuotedString, 0, `"f g"`},
 		{ItemString, 0, `h`},
+		tEOF,
+	}},
+	{"07.redirection out", `a >b c>d > e`, []Item{
+		{ItemString, 0, `a`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionOutChar, 0, `>`},
+		{ItemString, 0, `b`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `c`},
+		{ItemRedirectionOutChar, 0, `>`},
+		{ItemString, 0, `d`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionOutChar, 0, `>`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `e`},
+		tEOF,
+	}},
+	{"08.redirection in", `a <b c<d < e`, []Item{
+		{ItemString, 0, `a`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemString, 0, `b`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `c`},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemString, 0, `d`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `e`},
+		tEOF,
+	}},
+	{"09.redirection fdnum", `a 1<b c2<d 3< e`, []Item{
+		{ItemString, 0, `a`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionFDNumChar, 0, `1`},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemString, 0, `b`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `c2`},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemString, 0, `d`},
+		{ItemWhitespace, 0, ` `},
+		{ItemRedirectionFDNumChar, 0, `3`},
+		{ItemRedirectionInChar, 0, `<`},
+		{ItemWhitespace, 0, ` `},
+		{ItemString, 0, `e`},
 		tEOF,
 	}},
 }
