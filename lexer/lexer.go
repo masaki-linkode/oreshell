@@ -47,6 +47,7 @@ const (
 	ItemRedirectionInChar
 	ItemRedirectionOutChar
 	ItemRedirectionFDNumChar
+	ItemPipeChar
 )
 
 const eof = -1
@@ -167,6 +168,8 @@ func lexText(me *Lexer) stateFn {
 		} else {
 			return lexString
 		}
+	} else if r == '|' {
+		return lexPipeChar
 	} else {
 		return lexString
 	}
@@ -226,7 +229,7 @@ func lexQuotedString(me *Lexer) stateFn {
 }
 
 func isDelimiter(r rune) bool {
-	return unicode.IsSpace(r) || r == eof || r == '\\' || r == '"' || r == '\'' || r == '<' || r == '>'
+	return unicode.IsSpace(r) || r == eof || r == '\\' || r == '"' || r == '\'' || r == '<' || r == '>' || r == '|'
 }
 
 func lexRedirectionInChar(me *Lexer) stateFn {
@@ -244,8 +247,15 @@ func lexRedirectionOutChar(me *Lexer) stateFn {
 }
 
 func lexRedirectionFDNumChar(me *Lexer) stateFn {
-	log.Logger.Printf("lexNumberChar\n")
+	log.Logger.Printf("lexRedirectionFDNumberChar\n")
 	me.next()
 	me.emit(ItemRedirectionFDNumChar)
+	return lexText
+}
+
+func lexPipeChar(me *Lexer) stateFn {
+	log.Logger.Printf("lexPipeChar\n")
+	me.next()
+	me.emit(ItemPipeChar)
 	return lexText
 }

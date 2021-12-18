@@ -23,6 +23,10 @@ type SimpleCommand struct {
 	CommandSuffix CommandSuffix
 }
 
+type PipelineSequence struct {
+	SimpleCommands []*SimpleCommand
+}
+
 func (me *SimpleCommand) Argv() (argv []string) {
 	return append([]string{me.CommandName}, me.CommandSuffix.Args...)
 }
