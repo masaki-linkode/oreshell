@@ -25,7 +25,7 @@ func parseWord(l *lexer.Lexer) (word string, found foundItemType, err error) {
 		token := l.PeekItem()
 
 		if token.Type == lexer.ItemString || token.Type == lexer.ItemEscapeChar || token.Type == lexer.ItemQuotedString {
-			word = word + l.NextItem().Unescape()
+			word = word + l.NextItem().Val
 			log.Logger.Printf("word: %s\n", word)
 		} else if token.Type == lexer.ItemWhitespace {
 			log.Logger.Printf("found whitespace %s\n", word)
@@ -61,7 +61,7 @@ func parseCommandName(l *lexer.Lexer) (name string, found foundItemType, err err
 
 func parseRedirection(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirection\n")
-	r = &ast.Redirection{}
+
 	token := l.NextItem()
 	if token.Type == lexer.ItemRedirectionInChar {
 		return parseRedirectionIn(l, fdNum)
@@ -74,7 +74,6 @@ func parseRedirection(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foun
 
 func parseRedirectionIn(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirectionIn\n")
-	r = &ast.Redirection{}
 
 	for l.PeekItem().Type == lexer.ItemWhitespace {
 		l.NextItem()
@@ -84,12 +83,11 @@ func parseRedirectionIn(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found fo
 	if err != nil {
 		return nil, FoundError, err
 	}
-	return &ast.Redirection{Direction: ast.IN, FdNum: fdNum, FilePath: word}, found, nil
+	return ast.NewRedirection(ast.IN, fdNum, word), found, nil
 }
 
 func parseRedirectionOut(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirectionOut\n")
-	r = &ast.Redirection{}
 
 	for l.PeekItem().Type == lexer.ItemWhitespace {
 		l.NextItem()
@@ -100,14 +98,12 @@ func parseRedirectionOut(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found f
 	if err != nil {
 		return nil, FoundError, err
 	}
-	return &ast.Redirection{Direction: ast.OUT, FdNum: fdNum, FilePath: word}, found, nil
+	return ast.NewRedirection(ast.OUT, fdNum, word), found, nil
 }
 
-func parseCommandSuffix(l *lexer.Lexer) (c *ast.CommandSuffix, found foundItemType, err error) {
-	log.Logger.Printf("parseCommandSuffix\n")
+func parseWordsAndRedirections(l *lexer.Lexer) (words []string, rs []ast.Redirection, found foundItemType, err error) {
+	log.Logger.Printf("parseWordsAndRedirections\n")
 	r := &ast.Redirection{}
-	var args []string
-	var rs []ast.Redirection
 
 	for {
 		token := l.PeekItem()
@@ -116,44 +112,42 @@ func parseCommandSuffix(l *lexer.Lexer) (c *ast.CommandSuffix, found foundItemTy
 			l.NextItem()
 			fdNum, err := strconv.Atoi(token.Val)
 			if err != nil {
-				return nil, FoundError, err
+				return nil, nil, FoundError, err
 			}
 			r, found, err = parseRedirection(l, fdNum)
 			if err != nil {
-				return nil, FoundError, err
+				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else if token.Type == lexer.ItemRedirectionInChar {
 			l.NextItem()
 			r, found, err = parseRedirectionIn(l, process.FD_DEFAULT_IN)
 			if err != nil {
-				return nil, FoundError, err
+				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else if token.Type == lexer.ItemRedirectionOutChar {
 			l.NextItem()
 			r, found, err = parseRedirectionOut(l, process.FD_DEFAULT_OUT)
 			if err != nil {
-				return nil, FoundError, err
+				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else {
 			var word string
 			word, found, err = parseWord(l)
 			if err != nil {
-				return nil, FoundError, err
+				return nil, nil, FoundError, err
 			}
 			if len(word) > 0 {
-				args = append(args, word)
+				words = append(words, word)
 			}
 		}
 
 		if found == FoundEOF || found == FoundPipe {
-			log.Logger.Printf("parseCommandSuffix args:<%s>\n", args)
-			c = &ast.CommandSuffix{Args: args, Redirections: rs}
-
-			log.Logger.Printf("parseCommandSuffix end\n")
-			return c, found, nil
+			log.Logger.Printf("parseWordsAndRedirections words:<%s>\n", words)
+			log.Logger.Printf("parseWordsAndRedirections end\n")
+			return words, rs, found, nil
 		}
 	}
 }
@@ -161,26 +155,13 @@ func parseCommandSuffix(l *lexer.Lexer) (c *ast.CommandSuffix, found foundItemTy
 func parseSimpleCommand(l *lexer.Lexer) (s *ast.SimpleCommand, found foundItemType, err error) {
 	log.Logger.Printf("parseSimpleCommand\n")
 
-	s = &ast.SimpleCommand{}
-
-	word, found, err := parseCommandName(l)
+	words, rs, found, err := parseWordsAndRedirections(l)
 	if err != nil {
 		return nil, FoundError, err
 	}
-	log.Logger.Printf("s.CommandName:<%s>\n", word)
-	s.CommandName = word
-
-	if found != FoundEOF && found != FoundPipe {
-		c, f, err := parseCommandSuffix(l)
-		if err != nil {
-			return nil, FoundError, err
-		}
-		s.CommandSuffix = *c
-		found = f
-	}
 
 	log.Logger.Printf("parseSimpleCommand end\n")
-	return s, found, nil
+	return ast.NewSimpleCommand(words, rs), found, nil
 }
 
 func ParsePipelineSequence(l *lexer.Lexer) (ps *ast.PipelineSequence, err error) {

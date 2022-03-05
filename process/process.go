@@ -101,20 +101,19 @@ func (me *Pipe) close() {
 
 func NewProcess(simpleCommand *ast.SimpleCommand) (*Process, error) {
 	// 該当するプログラムを探す
-	command, err := absPathWithPATH(string(simpleCommand.CommandName))
+	command, err := absPathWithPATH(string(simpleCommand.CommandName()))
 	if err != nil {
 		return nil, err
 	}
 	log.Logger.Printf("command %s\n", command)
-	log.Logger.Printf("args : %v", simpleCommand.CommandSuffix.Args)
-	log.Logger.Printf("args size: %d", len(simpleCommand.CommandSuffix.Args))
+	log.Logger.Printf("argv : %v", simpleCommand.Argv())
 
 	return &Process{
 			command:      command,
 			argv:         simpleCommand.Argv(),
 			stdin:        os.Stdin,  // 初期値
 			stdout:       os.Stdout, // 初期値
-			redirections: &simpleCommand.CommandSuffix.Redirections,
+			redirections: simpleCommand.Redirections(),
 			previous:     nil,
 			next:         nil,
 			pipe:         nil,
@@ -156,19 +155,19 @@ func (me *Process) createProcAttrFiles() (files []*os.File, err error) {
 	// redirectionsから辞書へ
 	for _, v := range *me.redirections {
 		var f *os.File
-		if v.Direction == ast.IN {
+		if v.Direction() == ast.IN {
 			// 入力用ファイルオープン
-			f, err = os.Open(v.FilePath)
+			f, err = os.Open(v.FilePath())
 		} else { // ast.OUT
 			// 出力用ファイルオープン
-			f, err = os.Create(v.FilePath)
+			f, err = os.Create(v.FilePath())
 		}
 
 		if err != nil {
 			return nil, err
 		}
 
-		fdMap[v.FdNum] = f
+		fdMap[v.FdNum()] = f
 	}
 
 	// 辞書からFileの配列へ

@@ -25,14 +25,15 @@ func init() {
 // cdコマンド
 func chDir(simpleCommand *ast.SimpleCommand) (err error) {
 	var dir string
-	l := len(simpleCommand.CommandSuffix.Args)
+	args := simpleCommand.Args()
+	l := len(args)
 	if l == 0 {
 		dir, err = os.UserHomeDir()
 		if err != nil {
 			log.Logger.Fatalf("os.UserHomeDir %v", err)
 		}
 	} else if l == 1 {
-		dir = simpleCommand.CommandSuffix.Args[0]
+		dir = args[0]
 	} else {
 		return fmt.Errorf("%s: too many arguments", "cd")
 	}
@@ -104,7 +105,7 @@ func main() {
 
 		// 先頭の単語に該当するコマンドを探して実行する
 		// 内部コマンドか？
-		internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName]
+		internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName()]
 		if ok {
 			// 内部コマンドを実行
 			err = internalCommand(pipelineSequence.SimpleCommands[0])

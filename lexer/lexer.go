@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"fmt"
 	"oreshell/log"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -23,16 +22,6 @@ func (me Item) String() string {
 		return me.Val
 	}
 	return fmt.Sprintf("%q", me.Val)
-}
-
-func (me Item) Unescape() string {
-	switch {
-	case me.Type == ItemEscapeChar:
-		return string(me.Val[1])
-	case me.Type == ItemQuotedString:
-		return strings.Trim(me.Val, string(me.Val[0]))
-	}
-	return me.Val
 }
 
 type itemType int
