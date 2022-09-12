@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"oreshell/ast"
+	"oreshell/inner_command"
 	"oreshell/lexer"
 	"oreshell/log"
 	"oreshell/parser"
@@ -20,30 +21,6 @@ func init() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-// cdコマンド
-func chDir(simpleCommand *ast.SimpleCommand) (err error) {
-	var dir string
-	args := simpleCommand.Args()
-	l := len(args)
-	if l == 0 {
-		dir, err = os.UserHomeDir()
-		if err != nil {
-			log.Logger.Fatalf("os.UserHomeDir %v", err)
-		}
-	} else if l == 1 {
-		dir = args[0]
-	} else {
-		return fmt.Errorf("%s: too many arguments", "cd")
-	}
-	return os.Chdir(dir)
-}
-
-// exitコマンド
-func exit(simpleCommand *ast.SimpleCommand) (err error) {
-	os.Exit(0)
-	return nil
 }
 
 // 外部コマンドを実行する
@@ -66,8 +43,9 @@ func main() {
 
 	// 内部コマンド群
 	internalCommands := map[string]func(*ast.SimpleCommand) error{
-		"cd":   chDir,
-		"exit": exit,
+		"cd":     inner_command.ChDir,
+		"export": inner_command.ExportEnvironmentVariable,
+		"exit":   inner_command.Exit,
 	}
 
 	// ずっとループ
@@ -81,7 +59,7 @@ func main() {
 			// Ctrl+Dの場合
 			if err == io.EOF {
 				// 終了
-				exit(nil)
+				inner_command.Exit(nil)
 			} else {
 				log.Logger.Fatalf("reader.ReadLine %v", err)
 			}

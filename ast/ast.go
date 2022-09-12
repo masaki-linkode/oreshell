@@ -40,7 +40,7 @@ type SimpleCommand struct {
 }
 
 func NewSimpleCommand(words []string, rs []Redirection) (me *SimpleCommand) {
-	return &SimpleCommand{words: words, expandedWords: expansion.ExpandFilenames(words), redirections: rs}
+	return &SimpleCommand{words: words, expandedWords: expansion.Expand(words), redirections: rs}
 }
 
 func (me *SimpleCommand) Argv() []string {

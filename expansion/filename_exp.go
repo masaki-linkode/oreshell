@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-func ExpandFilename(src string) []string {
+func expandFilename(src string) []string {
 	log.Logger.Printf("extractArgs before: %s\n", src)
 	files, _ := filepath.Glob(src)
 	if files == nil { // argはワイルドカード文字列ではなかった、もしくはワイルドカード文字列だがヒットしなかった
@@ -15,9 +15,9 @@ func ExpandFilename(src string) []string {
 	return files
 }
 
-func ExpandFilenames(src []string) (dst []string) {
+func expandFilenames(src []string) (dst []string) {
 	for _, arg := range src {
-		dst = append(dst, ExpandFilename(arg)...)
+		dst = append(dst, expandFilename(arg)...)
 	}
 	return dst
 }
