@@ -34,13 +34,25 @@ func (me *Redirection) FilePath() string {
 }
 
 type SimpleCommand struct {
-	words         []string
-	expandedWords []string
-	redirections  []Redirection
+	rowVariables    map[string]string
+	rowWords        []string
+	expandVariables map[string]string
+	expandedWords   []string
+	redirections    []Redirection
 }
 
-func NewSimpleCommand(words []string, rs []Redirection) (me *SimpleCommand) {
-	return &SimpleCommand{words: words, expandedWords: expansion.Expand(words), redirections: rs}
+func NewSimpleCommand(variables map[string]string, words []string, rs []Redirection) (me *SimpleCommand) {
+	return &SimpleCommand{
+		rowVariables:    variables,
+		rowWords:        words,
+		expandVariables: expansion.ExpandVarableValues(variables),
+		expandedWords:   expansion.ExpandWords(words),
+		redirections:    rs,
+	}
+}
+
+func (me *SimpleCommand) Variables() map[string]string {
+	return me.expandVariables
 }
 
 func (me *SimpleCommand) Argv() []string {
@@ -48,15 +60,25 @@ func (me *SimpleCommand) Argv() []string {
 }
 
 func (me *SimpleCommand) Args() []string {
+	if len(me.expandedWords) == 0 {
+		return []string{}
+	}
 	return me.expandedWords[1:] // 先頭以外
 }
 
 func (me *SimpleCommand) CommandName() string {
+	if len(me.expandedWords) == 0 {
+		return ""
+	}
 	return me.expandedWords[0]
 }
 
 func (me *SimpleCommand) Redirections() *[]Redirection {
 	return &me.redirections
+}
+
+func (me *SimpleCommand) IsAssignVariablesOnly() bool {
+	return len(me.CommandName()) == 0 && len(me.Variables()) > 0
 }
 
 type PipelineSequence struct {

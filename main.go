@@ -8,6 +8,7 @@ import (
 	"oreshell/inner_command"
 	"oreshell/lexer"
 	"oreshell/log"
+	"oreshell/myvariables"
 	"oreshell/parser"
 	"oreshell/process"
 	"os"
@@ -46,6 +47,7 @@ func main() {
 		"cd":     inner_command.ChDir,
 		"export": inner_command.ExportEnvironmentVariable,
 		"exit":   inner_command.Exit,
+		"set":    inner_command.Set,
 	}
 
 	// ずっとループ
@@ -74,22 +76,27 @@ func main() {
 		// 字句解析
 		l := lexer.Lex(trimedL)
 		// 構文解析
-		pipelineSequence, err := parser.ParsePipelineSequence(l)
+		pipelineSequence, err := parser.NewParser().ParsePipelineSequence(l)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
 		log.Logger.Printf("pipelineSequence: %+v\n", pipelineSequence)
 
-		// 先頭の単語に該当するコマンドを探して実行する
-		// 内部コマンドか？
-		internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName()]
-		if ok {
-			// 内部コマンドを実行
-			err = internalCommand(pipelineSequence.SimpleCommands[0])
+		// 外部/内部コマンドは実行せずに、シェル変数代入のみか
+		if pipelineSequence.SimpleCommands[0].IsAssignVariablesOnly() {
+			myvariables.Variables().AssignValuesToShellVariables(pipelineSequence.SimpleCommands[0].Variables())
 		} else {
-			// 外部コマンドを実行
-			err = execExternalCommand(pipelineSequence)
+			// 先頭の単語に該当するコマンドを探して実行する
+			// 内部コマンドか？
+			internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName()]
+			if ok {
+				// 内部コマンドを実行
+				err = internalCommand(pipelineSequence.SimpleCommands[0])
+			} else {
+				// 外部コマンドを実行
+				err = execExternalCommand(pipelineSequence)
+			}
 		}
 
 		if err != nil {

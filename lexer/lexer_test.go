@@ -95,6 +95,10 @@ var lexTests = []lexTest{
 		{ItemString, 0, `e`},
 		tEOF,
 	}},
+	{"101.quoted string", `"\""`, []Item{
+		{ItemQuotedString, 0, `"\""`},
+		tEOF,
+	}},
 }
 
 func collect(t *lexTest) (items []Item) {

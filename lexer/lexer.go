@@ -43,6 +43,11 @@ const eof = -1
 
 type stateFn func(*Lexer) stateFn
 
+type ILexer interface {
+	PeekItem() Item
+	NextItem() Item
+}
+
 type Lexer struct {
 	input   string
 	state   stateFn
@@ -67,7 +72,7 @@ func (me *Lexer) NextItem() Item {
 	return item
 }
 
-func Lex(input string) *Lexer {
+func Lex(input string) ILexer {
 	l := &Lexer{
 		input: input,
 		items: list.New(),
@@ -85,7 +90,7 @@ func (me *Lexer) run() {
 }
 
 func (me *Lexer) next() rune {
-	//log.Logger.Printf("next\n")
+	log.Logger.Printf("next\n")
 
 	// 現在位置が入力文字列全体を超えたか
 	if int(me.pos) >= len(me.input) {
@@ -102,6 +107,7 @@ func (me *Lexer) next() rune {
 }
 
 func (me *Lexer) peek() rune {
+	log.Logger.Printf("peek\n")
 	r := me.next()
 	me.backup()
 	return r
@@ -201,7 +207,7 @@ func lexEscapeChar(me *Lexer) stateFn {
 }
 
 func lexQuotedString(me *Lexer) stateFn {
-	log.Logger.Printf("lexQuoteString\n")
+	log.Logger.Printf("lexQuoteString start\n")
 	q := me.next() // '"' or '\''
 
 	for {
@@ -211,9 +217,16 @@ func lexQuotedString(me *Lexer) stateFn {
 			return me.errorf("quotestring failed.")
 		} else if r == q {
 			break
+		} else if r == '\\' {
+			r = me.next()
+			if r == eof {
+				me.backup()
+				return me.errorf("quotestring failed.")
+			}
 		}
 	}
 	me.emit(ItemQuotedString)
+	log.Logger.Printf("lexQuoteString end\n")
 	return lexText
 }
 
