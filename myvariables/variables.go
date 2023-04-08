@@ -49,7 +49,11 @@ func (me variables) AssignValueToShellVariable(variable_name string, value strin
 	if me.osService.Hasenv(variable_name) {
 		return me.osService.Setenv(variable_name, value)
 	} else {
-		me.shellVariables[variable_name] = value
+		if len(value) > 0 {
+			me.shellVariables[variable_name] = value
+		} else {
+			delete(me.shellVariables, variable_name)
+		}
 		return nil
 	}
 }
