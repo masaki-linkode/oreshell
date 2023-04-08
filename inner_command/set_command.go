@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var CommandNameSet = "set"
+
 // setコマンド
 func Set(simpleCommand *ast.SimpleCommand) (err error) {
 	args := simpleCommand.Args()

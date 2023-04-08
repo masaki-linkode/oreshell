@@ -44,10 +44,11 @@ func main() {
 
 	// 内部コマンド群
 	internalCommands := map[string]func(*ast.SimpleCommand) error{
-		"cd":     inner_command.ChDir,
-		"export": inner_command.ExportEnvironmentVariable,
-		"exit":   inner_command.Exit,
-		"set":    inner_command.Set,
+		inner_command.CommandNameCd:     inner_command.ChDir,
+		inner_command.CommandNameExport: inner_command.ExportEnvironmentVariable,
+		inner_command.CommandNameExit:   inner_command.Exit,
+		inner_command.CommandNameSet:    inner_command.Set,
+		inner_command.CommandNameUnset:  inner_command.Unset,
 	}
 
 	// ずっとループ

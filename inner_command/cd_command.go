@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var CommandNameCd = "cd"
+
 // cdコマンド
 func ChDir(simpleCommand *ast.SimpleCommand) (err error) {
 	var dir string
@@ -20,7 +22,7 @@ func ChDir(simpleCommand *ast.SimpleCommand) (err error) {
 	} else if l == 1 {
 		dir = args[0]
 	} else {
-		return fmt.Errorf("%s: too many arguments", "cd")
+		return fmt.Errorf("%s: too many arguments", CommandNameCd)
 	}
 	return os.Chdir(dir)
 }

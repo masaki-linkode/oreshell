@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+var CommandNameExit = "exit"
+
 // exitコマンド
 func Exit(simpleCommand *ast.SimpleCommand) (err error) {
 	os.Exit(0)
