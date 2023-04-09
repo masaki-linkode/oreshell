@@ -34,8 +34,8 @@ func (me *Redirection) FilePath() string {
 }
 
 type SimpleCommand struct {
-	rowVariables    map[string]string
-	rowWords        []string
+	rawVariables    map[string]string
+	rawWords        []string
 	expandVariables map[string]string
 	expandedWords   []string
 	redirections    []Redirection
@@ -43,8 +43,8 @@ type SimpleCommand struct {
 
 func NewSimpleCommand(variables map[string]string, words []string, rs []Redirection) (me *SimpleCommand) {
 	return &SimpleCommand{
-		rowVariables:    variables,
-		rowWords:        words,
+		rawVariables:    variables,
+		rawWords:        words,
 		expandVariables: expansion.ExpandVarableValues(variables),
 		expandedWords:   expansion.ExpandWords(words),
 		redirections:    rs,
