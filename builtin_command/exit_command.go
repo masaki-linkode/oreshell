@@ -1,9 +1,11 @@
-package inner_command
+package builtin_command
 
 import (
 	"oreshell/ast"
 	"os"
 )
+
+var CommandNameExit = "exit"
 
 // exitコマンド
 func Exit(simpleCommand *ast.SimpleCommand) (err error) {

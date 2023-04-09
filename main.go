@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 	"oreshell/ast"
-	"oreshell/inner_command"
+	builtin "oreshell/builtin_command"
 	"oreshell/lexer"
 	"oreshell/log"
+	"oreshell/myvariables"
 	"oreshell/parser"
 	"oreshell/process"
 	"os"
@@ -42,10 +43,12 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 
 	// 内部コマンド群
-	internalCommands := map[string]func(*ast.SimpleCommand) error{
-		"cd":     inner_command.ChDir,
-		"export": inner_command.ExportEnvironmentVariable,
-		"exit":   inner_command.Exit,
+	builtinCommands := map[string]func(*ast.SimpleCommand) error{
+		builtin.CommandNameCd:     builtin.ChDir,
+		builtin.CommandNameExport: builtin.ExportEnvironmentVariable,
+		builtin.CommandNameExit:   builtin.Exit,
+		builtin.CommandNameSet:    builtin.Set,
+		builtin.CommandNameUnset:  builtin.Unset,
 	}
 
 	// ずっとループ
@@ -59,7 +62,7 @@ func main() {
 			// Ctrl+Dの場合
 			if err == io.EOF {
 				// 終了
-				inner_command.Exit(nil)
+				builtin.Exit(nil)
 			} else {
 				log.Logger.Fatalf("reader.ReadLine %v", err)
 			}
@@ -74,22 +77,27 @@ func main() {
 		// 字句解析
 		l := lexer.Lex(trimedL)
 		// 構文解析
-		pipelineSequence, err := parser.ParsePipelineSequence(l)
+		pipelineSequence, err := parser.NewParser().ParsePipelineSequence(l)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
 		log.Logger.Printf("pipelineSequence: %+v\n", pipelineSequence)
 
-		// 先頭の単語に該当するコマンドを探して実行する
-		// 内部コマンドか？
-		internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName()]
-		if ok {
-			// 内部コマンドを実行
-			err = internalCommand(pipelineSequence.SimpleCommands[0])
+		// 外部/内部コマンドは実行せずに、シェル変数代入のみか
+		if pipelineSequence.SimpleCommands[0].IsAssignVariablesOnly() {
+			myvariables.Variables().AssignValuesToShellVariables(pipelineSequence.SimpleCommands[0].Variables())
 		} else {
-			// 外部コマンドを実行
-			err = execExternalCommand(pipelineSequence)
+			// 先頭の単語に該当するコマンドを探して実行する
+			// 内部コマンドか？
+			builtinCommand, ok := builtinCommands[pipelineSequence.SimpleCommands[0].CommandName()]
+			if ok {
+				// 内部コマンドを実行
+				err = builtinCommand(pipelineSequence.SimpleCommands[0])
+			} else {
+				// 外部コマンドを実行
+				err = execExternalCommand(pipelineSequence)
+			}
 		}
 
 		if err != nil {

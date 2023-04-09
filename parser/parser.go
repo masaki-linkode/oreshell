@@ -5,6 +5,7 @@ import (
 	"oreshell/ast"
 	"oreshell/lexer"
 	"oreshell/log"
+	"oreshell/myvariables"
 	"oreshell/process"
 	"strconv"
 )
@@ -18,7 +19,17 @@ const (
 	Other
 )
 
-func parseWord(l *lexer.Lexer) (word string, found foundItemType, err error) {
+type Parser struct {
+	assignVariableParser myvariables.AssignVariableParser
+}
+
+func NewParser() Parser {
+	return Parser{
+		assignVariableParser: myvariables.NewAssignVariableParser(),
+	}
+}
+
+func (me Parser) parseWord(l lexer.ILexer) (word string, found foundItemType, err error) {
 	log.Logger.Printf("parseWord\n")
 	word = ""
 	for {
@@ -49,51 +60,51 @@ func parseWord(l *lexer.Lexer) (word string, found foundItemType, err error) {
 			l.NextItem()
 			return word, FoundEOF, nil
 		} else {
-			return "", FoundError, fmt.Errorf("ありえない")
+			return "", FoundError, fmt.Errorf("ありえない %+v, %+v, %+v", token.Pos, token.Type, token.Val)
 		}
 	}
 }
 
-func parseCommandName(l *lexer.Lexer) (name string, found foundItemType, err error) {
+func (me Parser) parseCommandName(l lexer.ILexer) (name string, found foundItemType, err error) {
 	log.Logger.Printf("parseCommandName\n")
-	return parseWord(l)
+	return me.parseWord(l)
 }
 
-func parseRedirection(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
+func (me Parser) parseRedirection(l lexer.ILexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirection\n")
 
 	token := l.NextItem()
 	if token.Type == lexer.ItemRedirectionInChar {
-		return parseRedirectionIn(l, fdNum)
+		return me.parseRedirectionIn(l, fdNum)
 	} else if token.Type == lexer.ItemRedirectionOutChar {
-		return parseRedirectionOut(l, fdNum)
+		return me.parseRedirectionOut(l, fdNum)
 	} else {
 		return nil, FoundError, fmt.Errorf("ありえない")
 	}
 }
 
-func parseRedirectionIn(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
+func (me Parser) parseRedirectionIn(l lexer.ILexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirectionIn\n")
 
 	for l.PeekItem().Type == lexer.ItemWhitespace {
 		l.NextItem()
 	}
 
-	word, found, err := parseWord(l)
+	word, found, err := me.parseWord(l)
 	if err != nil {
 		return nil, FoundError, err
 	}
 	return ast.NewRedirection(ast.IN, fdNum, word), found, nil
 }
 
-func parseRedirectionOut(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
+func (me Parser) parseRedirectionOut(l lexer.ILexer, fdNum int) (r *ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseRedirectionOut\n")
 
 	for l.PeekItem().Type == lexer.ItemWhitespace {
 		l.NextItem()
 	}
 
-	word, found, err := parseWord(l)
+	word, found, err := me.parseWord(l)
 	log.Logger.Printf("parseRedirectionOut word:%s\n", word)
 	if err != nil {
 		return nil, FoundError, err
@@ -101,7 +112,7 @@ func parseRedirectionOut(l *lexer.Lexer, fdNum int) (r *ast.Redirection, found f
 	return ast.NewRedirection(ast.OUT, fdNum, word), found, nil
 }
 
-func parseWordsAndRedirections(l *lexer.Lexer) (words []string, rs []ast.Redirection, found foundItemType, err error) {
+func (me Parser) parseWordsAndRedirections(l lexer.ILexer) (words []string, rs []ast.Redirection, found foundItemType, err error) {
 	log.Logger.Printf("parseWordsAndRedirections\n")
 	r := &ast.Redirection{}
 
@@ -114,28 +125,28 @@ func parseWordsAndRedirections(l *lexer.Lexer) (words []string, rs []ast.Redirec
 			if err != nil {
 				return nil, nil, FoundError, err
 			}
-			r, found, err = parseRedirection(l, fdNum)
+			r, found, err = me.parseRedirection(l, fdNum)
 			if err != nil {
 				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else if token.Type == lexer.ItemRedirectionInChar {
 			l.NextItem()
-			r, found, err = parseRedirectionIn(l, process.FD_DEFAULT_IN)
+			r, found, err = me.parseRedirectionIn(l, process.FD_DEFAULT_IN)
 			if err != nil {
 				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else if token.Type == lexer.ItemRedirectionOutChar {
 			l.NextItem()
-			r, found, err = parseRedirectionOut(l, process.FD_DEFAULT_OUT)
+			r, found, err = me.parseRedirectionOut(l, process.FD_DEFAULT_OUT)
 			if err != nil {
 				return nil, nil, FoundError, err
 			}
 			rs = append(rs, *r)
 		} else {
 			var word string
-			word, found, err = parseWord(l)
+			word, found, err = me.parseWord(l)
 			if err != nil {
 				return nil, nil, FoundError, err
 			}
@@ -152,29 +163,50 @@ func parseWordsAndRedirections(l *lexer.Lexer) (words []string, rs []ast.Redirec
 	}
 }
 
-func parseSimpleCommand(l *lexer.Lexer) (s *ast.SimpleCommand, found foundItemType, err error) {
+func (me Parser) parseSimpleCommand(l lexer.ILexer) (s *ast.SimpleCommand, found foundItemType, err error) {
 	log.Logger.Printf("parseSimpleCommand\n")
 
-	words, rs, found, err := parseWordsAndRedirections(l)
+	wordsIncludeAssignVariables, rs, found, err := me.parseWordsAndRedirections(l)
 	if err != nil {
 		return nil, FoundError, err
 	}
 
+	variables, words := me.devideWords(wordsIncludeAssignVariables)
+
 	log.Logger.Printf("parseSimpleCommand end\n")
-	return ast.NewSimpleCommand(words, rs), found, nil
+	return ast.NewSimpleCommand(variables, words, rs), found, nil
 }
 
-func ParsePipelineSequence(l *lexer.Lexer) (ps *ast.PipelineSequence, err error) {
+// シェル変数の代入文群と、コマンド(とその引数)を分離する
+func (me Parser) devideWords(wordsIncludeAssignVariables []string) (map[string]string, []string) {
+	var words []string
+	variables := map[string]string{}
+	// [assign variable1] [assign variable2] ... [command]
+	for i, v := range wordsIncludeAssignVariables {
+		ok, variable_name, value := me.assignVariableParser.TryParse(v)
+		if ok {
+			log.Logger.Printf("devideWords +%v, +%v", variable_name, value)
+			variables[variable_name] = value
+		} else { // コマンド文字列が見つかった
+			words = wordsIncludeAssignVariables[i:]
+			break
+		}
+	}
+	log.Logger.Printf("devideWords variables:+%v words:+%v\n", variables, words)
+	return variables, words
+}
+
+func (me Parser) ParsePipelineSequence(l lexer.ILexer) (ps *ast.PipelineSequence, err error) {
 	ps = &ast.PipelineSequence{}
 	sc := &ast.SimpleCommand{}
-	sc, found, err := parseSimpleCommand(l)
+	sc, found, err := me.parseSimpleCommand(l)
 	if err != nil {
 		return nil, err
 	}
 	ps.SimpleCommands = append(ps.SimpleCommands, sc)
 
 	for found == FoundPipe {
-		sc, found, err = parseSimpleCommand(l)
+		sc, found, err = me.parseSimpleCommand(l)
 		if err != nil {
 			return nil, err
 		}

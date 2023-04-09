@@ -19,13 +19,17 @@ func (me myOSServiceMock) Getenv(name string) string {
 	return me.m[name]
 }
 
+func (me myOSServiceMock) Hasenv(name string) bool {
+	return len(me.m[name]) > 0
+}
+
 func (me myOSServiceMock) Setenv(name string, val string) error {
 	me.m[name] = val
 	return nil
 }
 
-func newExpanderWithMyOSServiceMock() envVariableNamePartExpander {
-	me := newEnvVariableNamePartWithBraceExpander()
+func newExpanderWithMyOSServiceMock() variableNamePartExpander {
+	me := newVariableNamePartWithBraceExpander()
 	me.osService = myOSServiceMock{m: map[string]string{}}
 	return me
 }
@@ -33,7 +37,7 @@ func newExpanderWithMyOSServiceMock() envVariableNamePartExpander {
 func Test_osGetEnvByVariableNamePartWithBrace(t *testing.T) {
 	me := newExpanderWithMyOSServiceMock()
 	me.osService.Setenv("HOGE", "hige")
-	assert.Equal(t, "hige", me.osGetEnvByVariableNamePart("${HOGE}"))
+	assert.Equal(t, "hige", me.lookupVariables("${HOGE}"))
 }
 
 func Test_ExpandShellParameter(t *testing.T) {

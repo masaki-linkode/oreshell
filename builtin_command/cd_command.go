@@ -1,4 +1,4 @@
-package inner_command
+package builtin_command
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"oreshell/log"
 	"os"
 )
+
+var CommandNameCd = "cd"
 
 // cdコマンド
 func ChDir(simpleCommand *ast.SimpleCommand) (err error) {
@@ -20,7 +22,7 @@ func ChDir(simpleCommand *ast.SimpleCommand) (err error) {
 	} else if l == 1 {
 		dir = args[0]
 	} else {
-		return fmt.Errorf("%s: too many arguments", "cd")
+		return fmt.Errorf("%s: too many arguments", CommandNameCd)
 	}
 	return os.Chdir(dir)
 }

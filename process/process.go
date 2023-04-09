@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"oreshell/ast"
 	"oreshell/log"
+	"oreshell/myvariables"
 	"os"
 	"path/filepath"
 )
@@ -34,6 +35,7 @@ type Process struct {
 	next         *Process
 	pipe         *Pipe
 	osProcess    *os.Process
+	variablesMap map[string]string
 }
 
 // 該当パスが存在するかどうか
@@ -118,6 +120,7 @@ func NewProcess(simpleCommand *ast.SimpleCommand) (*Process, error) {
 			next:         nil,
 			pipe:         nil,
 			osProcess:    nil,
+			variablesMap: simpleCommand.Variables(),
 		},
 		nil
 }
@@ -182,9 +185,35 @@ func (me *Process) createProcAttrFiles() (files []*os.File, err error) {
 	return files, nil
 }
 
+func (me *Process) createProcAttrEnv() (env []string) {
+
+	assignVariableParser := myvariables.NewAssignVariableParser()
+
+	// シェルプロセスの環境変数とユーザが設定した環境変数をマージ
+	for _, v := range os.Environ() {
+		log.Logger.Printf("createProcAttrEnv %v", v)
+		_, name, value := assignVariableParser.TryParse(v)
+		_, ok := me.variablesMap[name]
+		if !ok { // ユーザ設定値を上書きしない
+			me.variablesMap[name] = value
+		}
+	}
+
+	// 環境変数のハッシュマップを配列に変換
+	ar := []string{}
+	for k, v := range me.variablesMap {
+		ar = append(ar, fmt.Sprintf("%s=%s", k, v))
+	}
+	return ar
+
+}
+
 func (me *Process) Start() (err error) {
 	var procAttr os.ProcAttr
 	procAttr.Files, err = me.createProcAttrFiles()
+	if me.variablesMap != nil || len(me.variablesMap) > 0 {
+		procAttr.Env = me.createProcAttrEnv()
+	}
 	if err != nil {
 		return err
 	}
