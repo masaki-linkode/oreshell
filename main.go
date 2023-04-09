@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"oreshell/ast"
-	"oreshell/inner_command"
+	builtin "oreshell/builtin_command"
 	"oreshell/lexer"
 	"oreshell/log"
 	"oreshell/myvariables"
@@ -43,12 +43,12 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 
 	// 内部コマンド群
-	internalCommands := map[string]func(*ast.SimpleCommand) error{
-		inner_command.CommandNameCd:     inner_command.ChDir,
-		inner_command.CommandNameExport: inner_command.ExportEnvironmentVariable,
-		inner_command.CommandNameExit:   inner_command.Exit,
-		inner_command.CommandNameSet:    inner_command.Set,
-		inner_command.CommandNameUnset:  inner_command.Unset,
+	builtinCommands := map[string]func(*ast.SimpleCommand) error{
+		builtin.CommandNameCd:     builtin.ChDir,
+		builtin.CommandNameExport: builtin.ExportEnvironmentVariable,
+		builtin.CommandNameExit:   builtin.Exit,
+		builtin.CommandNameSet:    builtin.Set,
+		builtin.CommandNameUnset:  builtin.Unset,
 	}
 
 	// ずっとループ
@@ -62,7 +62,7 @@ func main() {
 			// Ctrl+Dの場合
 			if err == io.EOF {
 				// 終了
-				inner_command.Exit(nil)
+				builtin.Exit(nil)
 			} else {
 				log.Logger.Fatalf("reader.ReadLine %v", err)
 			}
@@ -90,10 +90,10 @@ func main() {
 		} else {
 			// 先頭の単語に該当するコマンドを探して実行する
 			// 内部コマンドか？
-			internalCommand, ok := internalCommands[pipelineSequence.SimpleCommands[0].CommandName()]
+			builtinCommand, ok := builtinCommands[pipelineSequence.SimpleCommands[0].CommandName()]
 			if ok {
 				// 内部コマンドを実行
-				err = internalCommand(pipelineSequence.SimpleCommands[0])
+				err = builtinCommand(pipelineSequence.SimpleCommands[0])
 			} else {
 				// 外部コマンドを実行
 				err = execExternalCommand(pipelineSequence)

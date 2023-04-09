@@ -18,6 +18,11 @@ type variables struct {
 	shellVariables map[string]string
 }
 
+func (me variables) GetValueFromShellVariables(variable_name string) (string, bool) {
+	value, ok := me.shellVariables[variable_name]
+	return value, ok
+}
+
 func (me variables) GetValue(variable_name string) string {
 	value := me.osService.Getenv(variable_name)
 	if len(value) > 0 {

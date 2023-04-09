@@ -1,4 +1,4 @@
-package inner_command
+package builtin_command
 
 import (
 	"fmt"
